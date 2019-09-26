@@ -3,6 +3,9 @@ import calc
 
 
 class TokenizeTest(unittest.TestCase):
+    """
+    Unit tests for calc.tokenize()
+    """
 
     def test_empty(self):
         self.assertEqual([], calc.tokenize(''))
@@ -25,7 +28,13 @@ class TokenizeTest(unittest.TestCase):
         self.assertEqual(['1'], calc.tokenize('1'))
         self.assertEqual(['1', '+'], calc.tokenize('1+'))
         self.assertEqual(['1', '+', '2', '*', '3'], calc.tokenize('1+2*3'))
+        self.assertEqual(['-', '1', '+', '2', '*', '3'], calc.tokenize('-1+2*3'))
+        self.assertEqual(['-', '1.5', '+', '2', '*', '3'], calc.tokenize('-1.5+2*3'))
+        self.assertEqual(['-', '1.5', '+', '2', '*', '3'], calc.tokenize('- 1.5+2*3'))
         self.assertEqual(['1', '+', '2', '*', '3', '/', '4'], calc.tokenize('1+2*3/4'))
+        self.assertEqual(['1', '+', '-', '2', '*', '-', '3', '/', '4'], calc.tokenize('1+-2*-3/4'))
         self.assertEqual(['1', '+', '2', '*', '3', '/', '4', '-', '5'], calc.tokenize('1+2*3/4-5'))
         self.assertEqual(['10', '+', '20', '*', '30', '/', '40', '-', '50'], calc.tokenize('10+20*30/40-50'))
+        self.assertEqual(['11.0', '+', '22.0', '*', '33.0', '/', '44.0', '-', '55.0'],
+                         calc.tokenize('11.0+22.0*33.0/44.0-55.0'))
         self.assertEqual(['10', '+', '20', '*', '30', '/', '40', '-', '50'], calc.tokenize(' 10 + 20 * 30 / 40 - 50 '))
