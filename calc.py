@@ -1,24 +1,15 @@
+from __future__ import division
 import argparse
 from functools import total_ordering
 
 
 @total_ordering
 class OperatorBase(object):
-
     def __init__(self, token, precedence, operands=2, associativity='left'):
         self.token = token
         self.precedence = precedence
         self.operands = operands
         self.associativy = associativity
-
-    def __str__(self):
-        return "%s%d" % (self.token, self.operands)
-
-    def get_token(self):
-        return self.token
-
-    def get_precedence(self):
-        return self.precedence
 
     def is_unary(self):
         return self.operands == 1
@@ -49,16 +40,18 @@ class OperatorBase(object):
         if other is None:  # None act as "sentinel"
             return False
         if self.is_unary():
-            return False
+            return other.precedence >= self.precedence
+            # return False
         # self is binary
         if other.is_binary():
             if other.precedence > self.precedence:
                 return True
-            if other.precedence == self.precedence and other.is_left_assoc:
+            if other.precedence == self.precedence and other.is_left_assoc():
                 return True
             return False
         if other.is_unary():
-            return other.precedence >= self.precedence
+            # return other.precedence >= self.precedence
+            return True
 
     def do_eval(self, *args):
         """ Override this in Operator subclasses"""
@@ -66,58 +59,61 @@ class OperatorBase(object):
 
 
 class Plus(OperatorBase):
-
     def __init__(self):
-        super(Plus, self).__init__('+', 1)
+        super(Plus, self).__init__('+', 3)
 
     def do_eval(self, *args):
         return args[0] + args[1]
 
 
 class Minus(OperatorBase):
-
     def __init__(self):
-        super(Minus, self).__init__('-', 1)
+        super(Minus, self).__init__('-', 3)
 
     def do_eval(self, *args):
         return args[0] - args[1]
 
 
 class Multiply(OperatorBase):
-
     def __init__(self):
-        super(Multiply, self).__init__('*', 3)
+        super(Multiply, self).__init__('*', 5)
 
     def do_eval(self, *args):
         return args[0] * args[1]
 
 
 class Divide(OperatorBase):
-
     def __init__(self):
-        super(Divide, self).__init__('/', 3)
+        super(Divide, self).__init__('/', 5)
 
     def do_eval(self, *args):
         return args[0] / args[1]
 
 
-class UnaryMinus(OperatorBase):
-
+class Pow(OperatorBase):
     def __init__(self):
-        super(UnaryMinus, self).__init__('-', 2, 1)
+        super(Pow, self).__init__('^', 6, associativity='right')
+
+    def do_eval(self, *args):
+        return args[0] ** args[1]
+
+
+class UnaryMinus(OperatorBase):
+    def __init__(self):
+        super(UnaryMinus, self).__init__('-', 4, operands=1)
 
     def do_eval(self, *args):
         return args[0] * (-1)
 
 
 OPERATORS = [
-    Plus(), Minus(), Multiply(), Divide(), UnaryMinus()
+    Plus(), Minus(), Multiply(), Divide(), UnaryMinus(), Pow()
 ]
 
-BINARY_OPS = {op.get_token(): op for op in OPERATORS if op.is_binary()}
-UNARY_OPS = {op.get_token(): op for op in OPERATORS if op.is_unary()}
+BINARY_OPS = {op.token: op for op in OPERATORS if op.is_binary()}
+UNARY_OPS = {op.token: op for op in OPERATORS if op.is_unary()}
 
-VALID_TOKENS_SET = {op.get_token() for op in OPERATORS}
+VALID_TOKENS_SET = {op.token for op in OPERATORS}
 VALID_TOKENS_SET.add('(')
 VALID_TOKENS_SET.add(')')
 
@@ -229,7 +225,7 @@ class Recognizer(object):
             self._error()
 
 
-class BaseEvaluator(object):
+class EvaluatorBase(object):
     """
     Implementation of  Recursive-descent recognition algorithm from http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
     """
@@ -281,7 +277,7 @@ class BaseEvaluator(object):
         raise NotImplementedError()
 
 
-class ShuntingYardEvaluator(BaseEvaluator):
+class ShuntingYardEvaluator(EvaluatorBase):
     """
     Shunting yard algo implementation adapted from http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
     "The shunting yard algorithm"
@@ -305,7 +301,7 @@ class ShuntingYardEvaluator(BaseEvaluator):
             self._popoperator(operators, operands)
 
     def _p(self, operators, operands):
-        if is_value(self._next()):
+        if self._next() and self._next() not in VALID_TOKENS_SET:
             operands.append(self._mkleaf(self._next()))
             self._consume()
         elif self._next() == '(':
@@ -335,23 +331,18 @@ class ShuntingYardEvaluator(BaseEvaluator):
         operators.append(op)
 
 
-class ConcatArgs(argparse.Action):
-    """
-    Concatenate args input into one string
-    """
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, ''.join(values))
+def calc(expr):
+    tokens = tokenize(expr)
+    for t in tokens:
+        validate_token(t)
+    return ShuntingYardEvaluator(tokens).evaluate()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser(
         prefix_chars='$',  # redefine prefix_chars because the default "-" is a valid operand
         description="A simple calculator for infixed mathematical expressions")
-    parser.add_argument('expression', nargs='+', help="Expression to evaluate", action=ConcatArgs)
-    expression = parser.parse_args().expression
-
-    tokens = tokenize(expression)
-    for t in tokens:
-        validate_token(t)
-    Recognizer(tokens).recognize()
+    parser.add_argument('expression', nargs='+', help="Expression to evaluate")
+    expression = ''.join(parser.parse_args().expression)
+    result = calc()
+    print(result)

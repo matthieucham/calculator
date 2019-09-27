@@ -1,5 +1,6 @@
 import unittest
 import calc
+import os
 
 
 class TokenizeTest(unittest.TestCase):
@@ -95,7 +96,6 @@ class RecognizerTest(unittest.TestCase):
 
 
 class OperatorTest(unittest.TestCase):
-
     def test_compare(self):
         self.assertTrue(calc.Divide() > calc.Plus())
         self.assertTrue(calc.Multiply() > calc.Plus())
@@ -107,10 +107,13 @@ class OperatorTest(unittest.TestCase):
         self.assertFalse(calc.Divide() < calc.Minus())
         self.assertTrue(calc.Minus() == calc.Plus())
         self.assertFalse(calc.Multiply() == calc.Plus())
-        self.assertTrue(calc.UnaryMinus() > calc.Multiply())
-        self.assertTrue(calc.UnaryMinus() > calc.Divide())
+        self.assertTrue(calc.UnaryMinus() < calc.Multiply())
+        self.assertTrue(calc.UnaryMinus() < calc.Divide())
         self.assertTrue(calc.UnaryMinus() > calc.Plus())
         self.assertTrue(calc.UnaryMinus() > calc.Minus())
+        self.assertTrue(calc.Minus() < calc.UnaryMinus())
+
+    def test_compare_with_sentinel(self):
         self.assertTrue(None < calc.UnaryMinus())
         self.assertFalse(calc.UnaryMinus() < None)
         self.assertFalse(calc.Plus() < None)
@@ -118,8 +121,15 @@ class OperatorTest(unittest.TestCase):
         self.assertFalse(calc.Multiply() < None)
         self.assertFalse(calc.Divide() < None)
 
+    def test_base(self):
+        with self.assertRaises(NotImplementedError):
+            calc.OperatorBase('', 0, operands=0).eval()
+
 
 class SYEvaluatorTest(unittest.TestCase):
+    def test_base(self):
+        with self.assertRaises(NotImplementedError):
+            calc.EvaluatorBase([]).evaluate()
 
     def test_evaluate_unary(self):
         self.assertEqual(1, calc.ShuntingYardEvaluator(['1']).evaluate())
@@ -131,9 +141,38 @@ class SYEvaluatorTest(unittest.TestCase):
         self.assertEqual(5, calc.ShuntingYardEvaluator(['2', '+', '3']).evaluate())
         self.assertEqual(1, calc.ShuntingYardEvaluator(['-', '2', '+', '3']).evaluate())
         self.assertEqual(6, calc.ShuntingYardEvaluator(['2', '*', '3']).evaluate())
+        self.assertEqual(5, calc.ShuntingYardEvaluator(['2', '*', '3', '-', '1']).evaluate())
+        self.assertEqual(-7, calc.ShuntingYardEvaluator(['2', '-', '3', '*', '3']).evaluate())
+
+    def test_evaluate_minus_minus(self):
+        self.assertEqual(9, calc.ShuntingYardEvaluator(['-', '3', '*', '(', '-', '3', ')']).evaluate())
+        self.assertEqual(9, calc.ShuntingYardEvaluator(['-', '3', '*', '-', '3']).evaluate())
 
     def test_evaluate_par(self):
         self.assertEqual(14, calc.ShuntingYardEvaluator(['2', '*', '(', '7', ')']).evaluate())
+        self.assertEqual(-3, calc.ShuntingYardEvaluator(['9', '/', '(', '-', '3', ')']).evaluate())
+        self.assertEqual(-3, calc.ShuntingYardEvaluator(['9', '/', '(', '-', '3', ')']).evaluate())
         self.assertEqual(6, calc.ShuntingYardEvaluator(['2', '*', '(', '7', '-', '4', ')']).evaluate())
         self.assertEqual(1.5, calc.ShuntingYardEvaluator(['(', '7', '-', '4', ')', '/', '2']).evaluate())
 
+    def test_assoc(self):
+        self.assertEqual(6, calc.ShuntingYardEvaluator(['1', '+', '2', '+', '3', '+', '0']).evaluate())
+        self.assertEqual(8, calc.ShuntingYardEvaluator(['2', '*', '2', '*', '2', '*', '1']).evaluate())
+        self.assertEqual(256, calc.ShuntingYardEvaluator(['2', '^', '2', '^', '3']).evaluate())
+
+    def test_invalid(self):
+        with self.assertRaises(calc.InvalidExpressionError):
+            calc.ShuntingYardEvaluator(['1', '+']).evaluate()
+        with self.assertRaises(calc.InvalidExpressionError):
+            calc.ShuntingYardEvaluator(['(', '6']).evaluate()
+        with self.assertRaises(calc.InvalidExpressionError):
+            calc.ShuntingYardEvaluator(['abc']).evaluate()
+
+
+class MainTest(unittest.TestCase):
+
+    def test_main(self):
+        self.assertEqual(4, calc.calc('2+2'))
+
+if __name__ == "__main__":
+    unittest.main()
