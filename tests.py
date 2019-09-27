@@ -92,3 +92,48 @@ class RecognizerTest(unittest.TestCase):
     def test_recognize_bad_par(self):
         with self.assertRaises(calc.InvalidExpressionError):
             calc.Recognizer(['1', '/', '(', '2', '+', '3']).recognize()
+
+
+class OperatorTest(unittest.TestCase):
+
+    def test_compare(self):
+        self.assertTrue(calc.Divide() > calc.Plus())
+        self.assertTrue(calc.Multiply() > calc.Plus())
+        self.assertTrue(calc.Multiply() > calc.Minus())
+        self.assertTrue(calc.Divide() > calc.Minus())
+        self.assertFalse(calc.Divide() < calc.Plus())
+        self.assertFalse(calc.Multiply() < calc.Plus())
+        self.assertFalse(calc.Multiply() < calc.Minus())
+        self.assertFalse(calc.Divide() < calc.Minus())
+        self.assertTrue(calc.Minus() == calc.Plus())
+        self.assertFalse(calc.Multiply() == calc.Plus())
+        self.assertTrue(calc.UnaryMinus() > calc.Multiply())
+        self.assertTrue(calc.UnaryMinus() > calc.Divide())
+        self.assertTrue(calc.UnaryMinus() > calc.Plus())
+        self.assertTrue(calc.UnaryMinus() > calc.Minus())
+        self.assertTrue(None < calc.UnaryMinus())
+        self.assertFalse(calc.UnaryMinus() < None)
+        self.assertFalse(calc.Plus() < None)
+        self.assertFalse(calc.Minus() < None)
+        self.assertFalse(calc.Multiply() < None)
+        self.assertFalse(calc.Divide() < None)
+
+
+class SYEvaluatorTest(unittest.TestCase):
+
+    def test_evaluate_unary(self):
+        self.assertEqual(1, calc.ShuntingYardEvaluator(['1']).evaluate())
+        self.assertEqual(1.9, calc.ShuntingYardEvaluator(['1.9']).evaluate())
+        self.assertEqual(-1, calc.ShuntingYardEvaluator(['-', '1']).evaluate())
+        self.assertEqual(-1.5, calc.ShuntingYardEvaluator(['-', '1.5']).evaluate())
+
+    def test_evaluate_binary(self):
+        self.assertEqual(5, calc.ShuntingYardEvaluator(['2', '+', '3']).evaluate())
+        self.assertEqual(1, calc.ShuntingYardEvaluator(['-', '2', '+', '3']).evaluate())
+        self.assertEqual(6, calc.ShuntingYardEvaluator(['2', '*', '3']).evaluate())
+
+    def test_evaluate_par(self):
+        self.assertEqual(14, calc.ShuntingYardEvaluator(['2', '*', '(', '7', ')']).evaluate())
+        self.assertEqual(6, calc.ShuntingYardEvaluator(['2', '*', '(', '7', '-', '4', ')']).evaluate())
+        self.assertEqual(1.5, calc.ShuntingYardEvaluator(['(', '7', '-', '4', ')', '/', '2']).evaluate())
+
