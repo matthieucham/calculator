@@ -74,32 +74,6 @@ class ValidateTokenTest(unittest.TestCase):
             calc.validate_token('azerty')
 
 
-class RecognizerTest(unittest.TestCase):
-    def test_recognize_valid(self):
-        calc.Recognizer(['1']).recognize()
-        calc.Recognizer(['1.9']).recognize()
-        calc.Recognizer(['-', '1']).recognize()
-        calc.Recognizer(['-', '1.5']).recognize()
-        calc.Recognizer(['2', '+', '3']).recognize()
-        calc.Recognizer(['-', '2', '+', '3']).recognize()
-        calc.Recognizer(['2', '*', '3']).recognize()
-        calc.Recognizer(['2', '*', '(', '7', ')']).recognize()
-        calc.Recognizer(['2', '*', '(', '7', '-', '4', ')']).recognize()
-        calc.Recognizer(['(', '7', '-', '4', ')', '/', '2']).recognize()
-
-    def test_recognize_bad_grammar(self):
-        with self.assertRaises(calc.InvalidExpressionError):
-            calc.Recognizer(['1', '+']).recognize()
-
-    def test_recognize_bad_op(self):
-        with self.assertRaises(calc.InvalidExpressionError):
-            calc.Recognizer(['1', '#', '5']).recognize()
-
-    def test_recognize_bad_par(self):
-        with self.assertRaises(calc.InvalidExpressionError):
-            calc.Recognizer(['1', '/', '(', '2', '+', '3']).recognize()
-
-
 class OperatorTest(unittest.TestCase):
     def test_compare(self):
         self.assertTrue(calc.Divide() > calc.Plus())
@@ -166,11 +140,11 @@ class SYEvaluatorTest(unittest.TestCase):
         self.assertEqual(256, calc.ShuntingYardEvaluator(['2', '^', '2', '^', '3']).evaluate())
 
     def test_invalid(self):
-        with self.assertRaises(calc.InvalidExpressionError):
+        with self.assertRaises(calc.MalformedExpressionError):
             calc.ShuntingYardEvaluator(['1', '+']).evaluate()
-        with self.assertRaises(calc.InvalidExpressionError):
+        with self.assertRaises(calc.MalformedExpressionError):
             calc.ShuntingYardEvaluator(['(', '6']).evaluate()
-        with self.assertRaises(calc.InvalidExpressionError):
+        with self.assertRaises(calc.MalformedExpressionError):
             calc.ShuntingYardEvaluator(['abc']).evaluate()
 
 
@@ -206,11 +180,11 @@ class PCEvaluatorTest(unittest.TestCase):
         self.assertEqual(256, calc.PrecedenceClimbingEvaluator(['2', '^', '2', '^', '3']).evaluate())
 
     def test_invalid(self):
-        with self.assertRaises(calc.InvalidExpressionError):
+        with self.assertRaises(calc.MalformedExpressionError):
             calc.PrecedenceClimbingEvaluator(['1', '+']).evaluate()
-        with self.assertRaises(calc.InvalidExpressionError):
+        with self.assertRaises(calc.MalformedExpressionError):
             calc.PrecedenceClimbingEvaluator(['(', '6']).evaluate()
-        with self.assertRaises(calc.InvalidExpressionError):
+        with self.assertRaises(calc.MalformedExpressionError):
             calc.PrecedenceClimbingEvaluator(['abc']).evaluate()
 
 

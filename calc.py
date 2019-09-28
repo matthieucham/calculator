@@ -1,11 +1,47 @@
+#!/usr/bin/env python
+"""
+    Calculator
+    ==========
+
+    Calculator for infixed mathematical expressions.
+
+    :Example:
+    >>> calc("2+2")
+    4
+
+    Evaluators algorithms taken from Theodore Norvell article: "Parsing Expressions by Recursive Descent"
+    http///www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+"""
 from __future__ import division
 import argparse
 from functools import total_ordering
 
+__author__ = "Matthieu Grandrie"
+__copyright__ = "Copyright 2019, Matthieu Grandrie"
+__credits__ = ["Matthieu Grandrie", "Theodore Norvell"]
+__date__ = "2019-09-28"
+__maintainer__ = "Matthieu Grandrie"
+__status__ = "Production"
+__version__ = "1.0"
 
+
+##################################
+###           OPERATORS        ###
+##################################
 @total_ordering
 class OperatorBase(object):
+    """
+    Operators hierarchy base class
+    """
+
     def __init__(self, token, precedence, operands=2, associativity='left'):
+        """
+        Constructor
+        :param token: operator token in mathematical expressions, eg '+' for Add
+        :param precedence: operator relative precedence
+        :param operands:  number of operands of this operator (1 : unary, 2: binary)
+        :param associativity: associativity side : 'left' or 'right'
+        """
         self.token = token
         self.precedence = precedence
         self.operands = operands
@@ -24,10 +60,19 @@ class OperatorBase(object):
         return self.associativy == 'right'
 
     def eval(self, *args):
+        """
+        Check operands number and evaluate this operator applied to these operands
+        :param args: operands
+        :return: operation's result
+        """
         assert len(args) == self.operands, "Bad number of operands for operator %s: expected %d, got %d" % (
             self, self.operands, len(args))
         return self.do_eval(*args)
 
+    # Ordering of operators as defined here http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+    # This ordering is used by the Shunting Yard algorithm
+    # __eq__, __ne__ and __lt__ are the 3 required methods for custom ordering definition to be compatible with Python 2
+    # and Python 3
     def __eq__(self, other):
         if other is None:
             return False
@@ -41,8 +86,7 @@ class OperatorBase(object):
             return False
         if self.is_unary():
             return other.precedence >= self.precedence
-            # return False
-        # self is binary
+        # from here, self is binary
         if other.is_binary():
             if other.precedence > self.precedence:
                 return True
@@ -50,7 +94,6 @@ class OperatorBase(object):
                 return True
             return False
         if other.is_unary():
-            # return other.precedence >= self.precedence
             return True
 
     def do_eval(self, *args):
@@ -59,6 +102,8 @@ class OperatorBase(object):
 
 
 class Plus(OperatorBase):
+    """Addition"""
+
     def __init__(self):
         super(Plus, self).__init__('+', 3)
 
@@ -67,6 +112,8 @@ class Plus(OperatorBase):
 
 
 class Minus(OperatorBase):
+    """Subtraction"""
+
     def __init__(self):
         super(Minus, self).__init__('-', 3)
 
@@ -75,6 +122,8 @@ class Minus(OperatorBase):
 
 
 class Multiply(OperatorBase):
+    """Multiplication"""
+
     def __init__(self):
         super(Multiply, self).__init__('*', 5)
 
@@ -83,6 +132,8 @@ class Multiply(OperatorBase):
 
 
 class Divide(OperatorBase):
+    """Division"""
+
     def __init__(self):
         super(Divide, self).__init__('/', 5)
 
@@ -91,6 +142,8 @@ class Divide(OperatorBase):
 
 
 class Pow(OperatorBase):
+    """Power elevation"""
+
     def __init__(self):
         super(Pow, self).__init__('^', 6, associativity='right')
 
@@ -99,6 +152,8 @@ class Pow(OperatorBase):
 
 
 class UnaryMinus(OperatorBase):
+    """Minus sign, unary operator"""
+
     def __init__(self):
         super(UnaryMinus, self).__init__('-', 4, operands=1)
 
@@ -106,27 +161,36 @@ class UnaryMinus(OperatorBase):
         return args[0] * (-1)
 
 
+##################################
+###    CALC IMPLEMENTATION     ###
+##################################
+
+# Recognized operators
 OPERATORS = [
     Plus(), Minus(), Multiply(), Divide(), UnaryMinus(), Pow()
 ]
-
+# Organized in dicts
 BINARY_OPS = {op.token: op for op in OPERATORS if op.is_binary()}
 UNARY_OPS = {op.token: op for op in OPERATORS if op.is_unary()}
 
+# Tokens delimiters are operators'tokens and parenthesis
 VALID_TOKENS_SET = {op.token for op in OPERATORS}
 VALID_TOKENS_SET.add('(')
 VALID_TOKENS_SET.add(')')
 
 
 class InvalidTokenError(Exception):
+    """Exception raised in case of bad input"""
     pass
 
 
-class InvalidExpressionError(Exception):
+class MalformedExpressionError(Exception):
+    """Exception raised in case of malformed expression"""
     pass
 
 
 def remove_quotes(expr):
+    """If single or double quotes in expression, remove them"""
     return expr.replace('\'', '').replace('\"', '')
 
 
@@ -172,85 +236,71 @@ def is_value(token):
 
 
 def validate_token(token):
+    """
+    Check if token is valid. Valid token are stringified numbers, operators'tokens and parenthesis
+    :param token: token to check
+    :return: the same token if valid
+    :raise: InvalidTokenError if not valid
+    """
     if is_value(token) or token in VALID_TOKENS_SET:
         return token
     raise InvalidTokenError(token)
 
 
-class Recognizer(object):
-    """
-    Implementation of  Recursive-descent recognition algorithm from http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
-    """
-
-    def __init__(self, tokexpr):
-        assert tokexpr is not None, "Expression to recognize cannot be None, should at least be []"
-        self.tokens = tokexpr
-        self.cursor = 0
-
-    def _next(self):
-        if self.cursor < len(self.tokens):
-            return self.tokens[self.cursor]
-        return None  # all tokens consumed
-
-    def _consume(self):
-        self.cursor += 1  # move cursor up
-
-    def _error(self, msg=None):
-        raise InvalidExpressionError(msg)
-
-    def _expect(self, token):
-        try:
-            assert self._next() == token
-            self._consume()
-        except AssertionError:
-            self._error("Expected %s, got %s" % (token, self._next()))
-
-    def recognize(self):
-        self._e()
-        self._expect(None)
-
-    def _e(self):
-        self._p()
-        while self._next() in BINARY_OPS:
-            self._consume()
-            self._p()
-
-    def _p(self):
-        if is_value(self._next()):
-            self._consume()
-        elif self._next() == '(':
-            self._consume()
-            self._e()
-            self._expect(')')
-        elif self._next() in UNARY_OPS:
-            self._consume()
-            self._p()
-        else:
-            self._error()
-
-
 class EvaluatorBase(object):
     """
-    Implementation of  Recursive-descent recognition algorithm from http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+    Base class of evaluator algorithms.
+
+    Defines common methods of both algorithms from http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+    Theses methods have the same name as in this article.
+    - _next
+    - _consume
+    - _error
+    - _expect
+    - _binary
+    - _unary
+    - _eval_leaf
+    - _eval_node
+    Methods docstring are taken from the article.
     """
 
     def __init__(self, tokexpr):
+        """
+        Builder
+        :param tokexpr: Tokenize expression to be evaluated
+        """
         assert tokexpr is not None, "Expression to recognize cannot be None, should at least be []"
         self.tokens = tokexpr
         self.cursor = 0
 
     def _next(self):
+        """
+        :return: the next token of input or None to represent that there are no more input tokens. \
+        Does not alter the input tokens.
+        """
         if self.cursor < len(self.tokens):
             return self.tokens[self.cursor]
         return None  # all tokens consumed
 
     def _consume(self):
+        """
+        Consume one token. When "_next() == None", _consume is still allowed, but has no effect.
+        :return: None
+        """
         self.cursor += 1  # move cursor up
 
     def _error(self, msg=None):
-        raise InvalidExpressionError(msg)
+        """
+        Stops the parsing process and reports an error.
+        """
+        raise MalformedExpressionError(msg)
 
     def _expect(self, token):
+        """
+        Check if _next() is expected. Call _error if not.
+        :param token: Expected token
+        :return: None
+        """
         try:
             assert self._next() == token
             self._consume()
@@ -259,13 +309,24 @@ class EvaluatorBase(object):
 
     @staticmethod
     def _binary(token):
+        """
+        converts a binary operator's token to its operator
+        """
         return BINARY_OPS.get(token)
 
     @staticmethod
     def _unary(token):
+        """
+        converts an unary operator's token to its operator
+        """
         return UNARY_OPS.get(token)
 
     def _eval_leaf(self, token):
+        """
+        Convert a "value" token to its numerical value. Call _error() if casting fails
+        :param token: stringified value
+        :return: int or float depending on the token
+        """
         try:
             return int(token)
         except ValueError:
@@ -275,16 +336,28 @@ class EvaluatorBase(object):
                 self._error("'%s' cannot be cast to a number" % token)
 
     def _eval_node(self, operator, *args):
+        """
+        Compute the operation (operator, operands)
+        :param operator: operator
+        :param args: operands
+        :return: result
+        """
         return operator.eval(*args)
 
     def evaluate(self):
+        """Override in subclasses"""
         raise NotImplementedError()
 
 
 class ShuntingYardEvaluator(EvaluatorBase):
     """
-    Shunting yard algo implementation adapted from http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
-    "The shunting yard algorithm"
+    "The shunting yard algorithm" implementation, See article.
+    Article's methods name are kept:
+    - Eparser => evaluate
+    - E => _e
+    - P => _p
+    - popOperator => _popoperator
+    - pushOperator => _pushoperator
     """
 
     def evaluate(self):
@@ -336,6 +409,14 @@ class ShuntingYardEvaluator(EvaluatorBase):
 
 
 class PrecedenceClimbingEvaluator(EvaluatorBase):
+    """
+    "Precedence climbing" implementation, See article.
+    Article's methods name are kept:
+    - Eparser => evaluate
+    - Exp => _exp
+    - P => _p
+    """
+
     def evaluate(self):
         val = self._exp(0)
         self._expect(None)
@@ -375,6 +456,12 @@ class PrecedenceClimbingEvaluator(EvaluatorBase):
 
 
 def calc(expr, evaluator_class=PrecedenceClimbingEvaluator):
+    """
+    Do the whole work
+    :param expr: String expression
+    :param evaluator_class: class name of the evaluator to use for computation
+    :return: Evaluation result
+    """
     tokens = tokenize(remove_quotes(expr))
     for t in tokens:
         validate_token(t)
@@ -383,10 +470,9 @@ def calc(expr, evaluator_class=PrecedenceClimbingEvaluator):
 
 if __name__ == "__main__":  # pragma: no cover
     parser = argparse.ArgumentParser(
-        prefix_chars='$',  # redefine prefix_chars because the default "-" is a valid operand
-        description="A simple calculator for infixed mathematical expressions")
+        description="A simple calculator for infixed mathematical expressions. Supports operators +-/*^")
     parser.add_argument('expression', nargs='+', help="Expression to evaluate")
-    parser.add_argument('$algo',
+    parser.add_argument('-a', '--algo',
                         help="Choose evaluator algorithm: pc for Precedence Climbing (default) or sh for Shunting Yard",
                         choices=['pc', 'sh'], default='pc')
     expression = ''.join(parser.parse_args().expression)
