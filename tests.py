@@ -11,6 +11,11 @@ class TokenizeTest(unittest.TestCase):
     def test_empty(self):
         self.assertEqual([], calc.tokenize(''))
 
+    def test_remove_quotes(self):
+        self.assertEqual('2+2', calc.remove_quotes('\'2+2\''))
+        self.assertEqual('2+2', calc.remove_quotes('\"2+2\"'))
+        self.assertEqual('2+2', calc.remove_quotes('2+2'))
+
     def test_int_without_ops(self):
         self.assertEqual(['12'], calc.tokenize('12'))
         self.assertEqual(['12'], calc.tokenize('  12 '))
@@ -169,10 +174,54 @@ class SYEvaluatorTest(unittest.TestCase):
             calc.ShuntingYardEvaluator(['abc']).evaluate()
 
 
+class PCEvaluatorTest(unittest.TestCase):
+
+    def test_evaluate_unary(self):
+        self.assertEqual(1, calc.PrecedenceClimbingEvaluator(['1']).evaluate())
+        self.assertEqual(1.9, calc.PrecedenceClimbingEvaluator(['1.9']).evaluate())
+        self.assertEqual(-1, calc.PrecedenceClimbingEvaluator(['-', '1']).evaluate())
+        self.assertEqual(-1.5, calc.PrecedenceClimbingEvaluator(['-', '1.5']).evaluate())
+
+    def test_evaluate_binary(self):
+        self.assertEqual(5, calc.PrecedenceClimbingEvaluator(['2', '+', '3']).evaluate())
+        self.assertEqual(1, calc.PrecedenceClimbingEvaluator(['-', '2', '+', '3']).evaluate())
+        self.assertEqual(6, calc.PrecedenceClimbingEvaluator(['2', '*', '3']).evaluate())
+        self.assertEqual(5, calc.PrecedenceClimbingEvaluator(['2', '*', '3', '-', '1']).evaluate())
+        self.assertEqual(-7, calc.PrecedenceClimbingEvaluator(['2', '-', '3', '*', '3']).evaluate())
+
+    def test_evaluate_minus_minus(self):
+        self.assertEqual(9, calc.PrecedenceClimbingEvaluator(['-', '3', '*', '(', '-', '3', ')']).evaluate())
+        self.assertEqual(9, calc.PrecedenceClimbingEvaluator(['-', '3', '*', '-', '3']).evaluate())
+
+    def test_evaluate_par(self):
+        self.assertEqual(14, calc.PrecedenceClimbingEvaluator(['2', '*', '(', '7', ')']).evaluate())
+        self.assertEqual(-3, calc.PrecedenceClimbingEvaluator(['9', '/', '(', '-', '3', ')']).evaluate())
+        self.assertEqual(-3, calc.PrecedenceClimbingEvaluator(['9', '/', '(', '-', '3', ')']).evaluate())
+        self.assertEqual(6, calc.PrecedenceClimbingEvaluator(['2', '*', '(', '7', '-', '4', ')']).evaluate())
+        self.assertEqual(1.5, calc.PrecedenceClimbingEvaluator(['(', '7', '-', '4', ')', '/', '2']).evaluate())
+
+    def test_assoc(self):
+        self.assertEqual(6, calc.PrecedenceClimbingEvaluator(['1', '+', '2', '+', '3', '+', '0']).evaluate())
+        self.assertEqual(8, calc.PrecedenceClimbingEvaluator(['2', '*', '2', '*', '2', '*', '1']).evaluate())
+        self.assertEqual(256, calc.PrecedenceClimbingEvaluator(['2', '^', '2', '^', '3']).evaluate())
+
+    def test_invalid(self):
+        with self.assertRaises(calc.InvalidExpressionError):
+            calc.PrecedenceClimbingEvaluator(['1', '+']).evaluate()
+        with self.assertRaises(calc.InvalidExpressionError):
+            calc.PrecedenceClimbingEvaluator(['(', '6']).evaluate()
+        with self.assertRaises(calc.InvalidExpressionError):
+            calc.PrecedenceClimbingEvaluator(['abc']).evaluate()
+
+
+
 class MainTest(unittest.TestCase):
 
-    def test_main(self):
+    def test_calc_sye(self):
         self.assertEqual(4, calc.calc('2+2'))
+
+    def test_calc_pce(self):
+        self.assertEqual(4, calc.calc('2+2', calc.PrecedenceClimbingEvaluator))
 
 if __name__ == "__main__":
     unittest.main()

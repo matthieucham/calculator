@@ -126,6 +126,10 @@ class InvalidExpressionError(Exception):
     pass
 
 
+def remove_quotes(expr):
+    return expr.replace('\'', '').replace('\"', '')
+
+
 def tokenize(expr):
     """
     Build a list of tokens (operators and operands) from an input expression string
@@ -261,7 +265,7 @@ class EvaluatorBase(object):
     def _unary(token):
         return UNARY_OPS.get(token)
 
-    def _mkleaf(self, token):
+    def _eval_leaf(self, token):
         try:
             return int(token)
         except ValueError:
@@ -270,7 +274,7 @@ class EvaluatorBase(object):
             except ValueError:
                 self._error("'%s' cannot be cast to a number" % token)
 
-    def _mknode(self, operator, *args):
+    def _eval_node(self, operator, *args):
         return operator.eval(*args)
 
     def evaluate(self):
@@ -302,7 +306,7 @@ class ShuntingYardEvaluator(EvaluatorBase):
 
     def _p(self, operators, operands):
         if self._next() and self._next() not in VALID_TOKENS_SET:
-            operands.append(self._mkleaf(self._next()))
+            operands.append(self._eval_leaf(self._next()))
             self._consume()
         elif self._next() == '(':
             self._consume()
@@ -321,9 +325,9 @@ class ShuntingYardEvaluator(EvaluatorBase):
         if operators[-1] is not None and operators[-1].is_binary():
             second = operands.pop()
             first = operands.pop()
-            operands.append(self._mknode(operators.pop(), first, second))
+            operands.append(self._eval_node(operators.pop(), first, second))
         else:  # unary
-            operands.append(self._mknode(operators.pop(), operands.pop()))
+            operands.append(self._eval_node(operators.pop(), operands.pop()))
 
     def _pushoperator(self, op, operators, operands):
         while operators[-1] > op:
@@ -331,11 +335,50 @@ class ShuntingYardEvaluator(EvaluatorBase):
         operators.append(op)
 
 
-def calc(expr):
-    tokens = tokenize(expr)
+class PrecedenceClimbingEvaluator(EvaluatorBase):
+    def evaluate(self):
+        val = self._exp(0)
+        self._expect(None)
+        return val
+
+    def _exp(self, precedence):
+        t = self._p()
+        while self._next() in BINARY_OPS and EvaluatorBase._binary(self._next()).precedence >= precedence:
+            op = EvaluatorBase._binary(self._next())
+            self._consume()
+            if op.is_right_assoc():
+                q = op.precedence
+            else:
+                q = op.precedence + 1
+            t1 = self._exp(q)
+            t = self._eval_node(op, t, t1)
+        return t
+
+    def _p(self):
+        if self._next() in UNARY_OPS:
+            op = EvaluatorBase._unary(self._next())
+            self._consume()
+            q = op.precedence
+            t = self._exp(q)
+            return self._eval_node(op, t)
+        elif self._next() == '(':
+            self._consume()
+            t = self._exp(0)
+            self._expect(')')
+            return t
+        elif self._next() and self._next() not in VALID_TOKENS_SET:
+            t = self._eval_leaf(self._next())
+            self._consume()
+            return t
+        else:
+            self._error()
+
+
+def calc(expr, evaluator_class=PrecedenceClimbingEvaluator):
+    tokens = tokenize(remove_quotes(expr))
     for t in tokens:
         validate_token(t)
-    return ShuntingYardEvaluator(tokens).evaluate()
+    return evaluator_class(tokens).evaluate()
 
 
 if __name__ == "__main__":  # pragma: no cover
@@ -343,6 +386,12 @@ if __name__ == "__main__":  # pragma: no cover
         prefix_chars='$',  # redefine prefix_chars because the default "-" is a valid operand
         description="A simple calculator for infixed mathematical expressions")
     parser.add_argument('expression', nargs='+', help="Expression to evaluate")
+    parser.add_argument('$algo',
+                        help="Choose evaluator algorithm: pc for Precedence Climbing (default) or sh for Shunting Yard",
+                        choices=['pc', 'sh'], default='pc')
     expression = ''.join(parser.parse_args().expression)
-    result = calc()
-    print(result)
+    if parser.parse_args().algo == 'sh':
+        res = calc(expression, ShuntingYardEvaluator)
+    else:
+        res = calc(expression)
+    print(res)
