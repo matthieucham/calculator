@@ -1,0 +1,9 @@
+language: python
+cache: pip
+install:
+  - pip install tox
+script:
+  - tox
+after_success:
+  - pip install coveralls
+  - coveralls
