@@ -65,7 +65,7 @@ Same as Python basic operations behaviour: if the result of the evaluation is an
  
  ``pip install tox``
  
- The simply run
+ Then simply run
  
  ``tox``
  
@@ -74,3 +74,7 @@ Same as Python basic operations behaviour: if the result of the evaluation is an
  Run the full test suite with unittests
  
  ``python -m unittest -v tests`` 
+ 
+ # Acknowledgment
+ 
+ Thanks to Mr Theo Norvell for its precious article "Parsing Expressions by Recursive Descent" http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
