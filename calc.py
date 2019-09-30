@@ -101,6 +101,8 @@ class OperatorBase(object):
         raise NotImplementedError()
 
 
+# Precedence value of operators starting at 3 to match precedence in the article
+
 class Plus(OperatorBase):
     """Addition"""
 
@@ -352,6 +354,12 @@ class EvaluatorBase(object):
 class ShuntingYardEvaluator(EvaluatorBase):
     """
     "The shunting yard algorithm" implementation, See article.
+
+    It implements the following grammar parsing:
+        E --> P {B P}
+        P --> v | "(" E ")" | U P
+        B --> "+" | "-" | "*" | "/" | "^"
+        U --> "-"
     Article's methods name are kept:
     - Eparser => evaluate
     - E => _e
@@ -361,6 +369,10 @@ class ShuntingYardEvaluator(EvaluatorBase):
     """
 
     def evaluate(self):
+        """
+        Evaluate self.tokens by parsing the Grammar and holding 2 stacks : 1 stack of operators, 1 stack of operands.
+        :return: evaluation result as a numerical value
+        """
         operators = []
         operands = []
         operators.append(None)
@@ -374,6 +386,7 @@ class ShuntingYardEvaluator(EvaluatorBase):
             self._pushoperator(self._binary(self._next()), operators, operands)
             self._consume()
             self._p(operators, operands)
+        # remaining operators are ordered by precedence desc : pop it all taking operands in operands stack :
         while operators[-1] is not None:
             self._popoperator(operators, operands)
 
@@ -411,6 +424,13 @@ class ShuntingYardEvaluator(EvaluatorBase):
 class PrecedenceClimbingEvaluator(EvaluatorBase):
     """
     "Precedence climbing" implementation, See article.
+
+    It implements the following grammar parsing:
+        E --> Exp(0)
+        Exp(p) --> P { B Exp(q) }
+        P --> U Exp(q) | "(" E ")" | v
+        B --> "+" | "-" | "*" | "/" | "^"
+        U --> "-"
     Article's methods name are kept:
     - Eparser => evaluate
     - Exp => _exp
@@ -447,7 +467,7 @@ class PrecedenceClimbingEvaluator(EvaluatorBase):
             t = self._exp(0)
             self._expect(')')
             return t
-        elif self._next() and self._next() not in VALID_TOKENS_SET:
+        elif self._next() and self._next() not in VALID_TOKENS_SET:  # must be digits at this point
             t = self._eval_leaf(self._next())
             self._consume()
             return t
