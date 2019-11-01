@@ -45,6 +45,9 @@ class TokenizeTest(unittest.TestCase):
                          calc.tokenize('11.0+22.0*33.0/44.0-55.0'))
         self.assertEqual(['10', '+', '20', '*', '30', '/', '40', '-', '50'], calc.tokenize(' 10 + 20 * 30 / 40 - 50 '))
 
+    def test_bug_sl(self):
+        self.assertEqual(['-', '1', '-', '1'], calc.tokenize('-1-1'))
+
 
 class ValidateTokenTest(unittest.TestCase):
     def test_none(self):
@@ -147,9 +150,11 @@ class SYEvaluatorTest(unittest.TestCase):
         with self.assertRaises(calc.MalformedExpressionError):
             calc.ShuntingYardEvaluator(['abc']).evaluate()
 
+    def test_bug_sl(self):
+        self.assertEqual(-2, calc.ShuntingYardEvaluator(['-', '1', '-', '1']).evaluate())
+
 
 class PCEvaluatorTest(unittest.TestCase):
-
     def test_evaluate_unary(self):
         self.assertEqual(1, calc.PrecedenceClimbingEvaluator(['1']).evaluate())
         self.assertEqual(1.9, calc.PrecedenceClimbingEvaluator(['1.9']).evaluate())
@@ -186,16 +191,24 @@ class PCEvaluatorTest(unittest.TestCase):
             calc.PrecedenceClimbingEvaluator(['(', '6']).evaluate()
         with self.assertRaises(calc.MalformedExpressionError):
             calc.PrecedenceClimbingEvaluator(['abc']).evaluate()
-
+    
+    def test_bug_sl(self):
+        self.assertEqual(-2, calc.PrecedenceClimbingEvaluator(['-', '1', '-', '1']).evaluate())
 
 
 class MainTest(unittest.TestCase):
-
     def test_calc_sye(self):
-        self.assertEqual(4, calc.calc('2+2'))
+        self.assertEqual(4, calc.calc('2+2', calc.ShuntingYardEvaluator))
 
     def test_calc_pce(self):
         self.assertEqual(4, calc.calc('2+2', calc.PrecedenceClimbingEvaluator))
+
+    def test_bug_sl(self):
+        self.assertEqual(-2, calc.calc('-1-1', calc.PrecedenceClimbingEvaluator))
+
+    def test_bug_sl_sh(self):
+        self.assertEqual(-2, calc.calc('-1-1', calc.ShuntingYardEvaluator))
+
 
 if __name__ == "__main__":
     unittest.main()
